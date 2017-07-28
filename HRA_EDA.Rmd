@@ -1,0 +1,608 @@
+---
+title: "HR Analytics"
+output:
+  html_document:
+    number_sections: TRUE
+    toc: TRUE
+    fig_height: 6
+    fig_width: 9
+    code_folding: hide
+---
+
+# Introduction
+This is an Exploratory Data Analysis for the Human Resources Analytics dataset.
+The primary dataset includes satisfaction level, last evaluation, salary,number of projects, and other variables.
+The data comes in the shape of 14,999 observations, where each row contains one employee record and whether that employee has left or not.
+Suggestions and feedback are most welcome. **Please upvote** if you find it useful.
+
+We need to find out what are the potential reasons behind employees leaving the company.
+We will first examine the individual distributions of the variables, and then examine the relationships between the variables.
+```{r}
+#importing required libraries
+library(tidyverse)
+library(plotly)
+options(warn=-1)
+library(lattice)
+library("GGally")
+```
+
+We will first import the data, and take a glimpse at it.
+```{r}
+# importing data
+HR = read.csv("~/Downloads/HR_comma_sep.csv", check.names = FALSE, header = TRUE)
+
+c(ncol(HR),nrow(HR))
+sum(is.na(HR))/(ncol(HR)*nrow(HR))
+
+glimpse(HR)
+```
+
+We can see that:
+
+ 1. There is a total of 10 columns, with 5 categorical variables(Work_accident, left, promotion_last_5years, sales, and salary), and rest of the 5 are quantitative variables.
+ 2. We have 14999 samples in our Human resources dataset.
+ 3. There are no null values at all in the dataset.(*yayyy!!*)
+ 
+## Few other questions:
+
+ 1. Is satisfaction level or/and last evaluation or/and salary or/and promotion related to people leaving the job?
+ 2. Does a specific department find it difficult to retain employees?
+ 3. Does number of projects relate to the satisfaction level or/and promotion or/and leaving the company?
+ 4. Does accident at work place provide any information about a person leaving the company?
+ 5. How is the salary spread across different departments?
+ 6. Does average monthly hours or/and time spent in the company tell anything about a person leaving the job?
+ 7. Does time spent in the company or/and average monthly hours relate to number of projects?
+ 
+ We'll explore these and other relations ahead.
+ 
+# Examine individual distributions
+First, we will examine the individual distributions of the variables.
+We will begin with quantitative variables.
+```{r}
+#function to create multiplots
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+
+```{r}
+#viewing histograms for the quantitative variables
+p1 <- ggplot(HR, aes(satisfaction_level)) +
+  geom_histogram(bins=20)
+p2 <- ggplot(HR, aes(last_evaluation)) +
+  geom_histogram(bins=20)
+p3 <- ggplot(HR, aes(number_project)) +
+  geom_histogram(bins=20)
+p4 <- ggplot(HR, aes(average_montly_hours)) +
+  geom_histogram(bins=20)
+p5 <- ggplot(HR, aes(time_spend_company)) +
+  geom_histogram(bins=20)
+
+multiplot(p1, p2, p3, p4, p5, cols = 2)
+```
+
+```{r}
+#viewing the boxplots for the quantitative variables
+g1 <- ggplot(HR, aes(x = "", y = satisfaction_level)) + 
+  geom_boxplot()
+g2 <- ggplot(HR, aes(x = "", y = last_evaluation)) + 
+  geom_boxplot()
+g3 <- ggplot(HR, aes(x = "", y = number_project)) + 
+  geom_boxplot()
+g4 <- ggplot(HR, aes(x = "", y = average_montly_hours)) + 
+  geom_boxplot()
+g5 <- ggplot(HR, aes(x = "", y = time_spend_company)) + 
+  geom_boxplot()
+
+multiplot(g1, g2, g3, g4, g5, cols=2)
+```
+
+```{r}
+# getting numerical summaries for the quantitative variables
+summary(subset(HR, select = c(satisfaction_level, average_montly_hours, 
+                              last_evaluation, time_spend_company,
+                             number_project)))
+```
+
+## Observations
+It can be noticed that none of the distributions is skewed, other than time_spend_company with its outliers. Thus we could use either mean or median as a measure of center. We'll be using median, and the corresponding five-point summary, for our analysis and rough inferences here:
+
+ 1. Satisfaction level:
+ * More than 50% of the employees are more than average satisfied(0.64) with the company.  
+ * However, there are approx. 900(6%) highly dissatisfied employees(leftmost peak in histogram) with satisfaction level less than 0.1.
+* The below average satisfaction level of around 50% employees may be a reason of leaving(we'll see later).
+
+ 2. Last evaluation:
+ * Around 75% of the employees got an above average evaluation(0.56), with 50% getting a rating of 0.72 or higher out of 1.
+* In spite of this, we saw that around 50% employees are not much satisfied. This may mean that a good evaluation may not necessarily mean that the employee is satisfied.
+* Around 1300 employees(8%) had an average last evaluation(0.5).
+
+ 3. Number of projects:
+* Employees have done 2 to 7 projects in the company, with 50% of them having done 4 or more projects, and 25% having done 5 or more projects.
+
+ 4. Average monthly hours:
+* Employees are spending as less as 96 average monthly hours to as many as 310 monthly hours. This is a wide range(214 hours). This is why it has a high standard deviation too(49.94 hours).
+* Around 50% of the employees are spending 200 or more average monthly hours. 
+* The distribution of average monthly hours is roughly uniform.
+
+ 5. Time spent at company:
+* 75% of the employees spend 4 hours or less in the company, with as much as 50% spending just 3 hours or less.
+* Around 6500(43%) of the employees spend just 3 hours at the company.
+* There are a few employees(outliers: around 1300), spending from around 6 to 10 hours
+
+We will now examine the categorical variables.
+We have 5 categorical variables, viz. Work_accident, left, promotion_last_5years, sales, salary. Let's explore them.
+```{r}
+"replacing binary variables with categories for easier understanding"
+HR$Work_accident[HR$Work_Accident=="0"] = 'No'
+HR$Work_accident[HR$Work_Accident=="1"] = 'Yes'
+
+HR$left[HR$left==0] = 'No'
+HR$left[HR$left==1] = 'Yes'
+
+HR$promotion_last_5years[HR$promotion_last_5years==0] = 'No'
+HR$promotion_last_5years[HR$promotion_last_5years==1] = 'Yes'
+
+#plotting bar graphs for categorical variables
+g1 <- ggplot(data =HR) + 
+    geom_bar(mapping=aes(x=Work_accident, fill = Work_accident)) +
+    theme(legend.position="none")
+g2 <- ggplot(data =HR) + 
+    geom_bar(mapping=aes(x=left, fill = left))+
+    theme(legend.position="none")
+g3 <- ggplot(data =HR) + 
+    geom_bar(mapping=aes(x=promotion_last_5years, fill = promotion_last_5years))+
+    theme(legend.position="none")
+g4 <- ggplot(data =HR) + 
+    geom_bar(mapping=aes(x=salary, fill = salary))+
+    theme(legend.position="none")
+
+multiplot(g1, g2, g3, g4, cols=2)
+
+g5 <- ggplot(HR) 
+g5 + geom_bar(mapping=aes(x=sales, fill = sales))
+```
+
+## Observations
+
+ 1. Work accident:
+ * Around 14%(2,169) of the employees had a work accident. This is a huge number of employees being in an aciddent at work.
+
+ 2. Promotion in last 5 years
+ * Only around 2%(319) employees have been promoted in last 5 years. This is a very small number of promotions from among 14,999 employees. Can this be related to satisfaction level?. We'll see later.
+
+ 3. Salary:
+ * Around 49%(7,316) employees have a low salary. This may also be related to people leaving the company or low satisfaction level.
+ * Only around 8%(1,237) employees have a high salary, with around 43%(6,446) employees having a medium salary.
+ * Thus, about half of the employees have a low salary
+
+ 4. Department:
+ * Sales department has the highest number of employees, i.e. 4,140(around 28%). 
+ * Technical and Support departments are the 2nd and the 3rd highest employed, with 2,720(around 18%) and 2,229(around 15%) employees, respectively.
+ * All the other departments have comparatively much less number of employees, with IT being the only other department with more than a 1000 employees. 
+ * This company seems to be a particularly Sales-oriented company, because of a marginally huge number of employees in the Sales department.
+
+ 5. Left:
+ * Around 24%(3,571) of the employees have left the company. 
+ 
+# Examine relationships
+We will now examine relationships among different variables.
+
+```{r}
+#plotting boxplots for satisfaction_level across multiple categories in different categorical variables
+g1 <- ggplot(HR, aes(x = sales, y = satisfaction_level, fill=sales)) + 
+  geom_boxplot() 
+g2 <- ggplot(HR, aes(x = Work_accident, y = satisfaction_level, fill=Work_accident)) + 
+  geom_boxplot()
+g3 <- ggplot(HR, aes(x = promotion_last_5years, y = satisfaction_level, fill=promotion_last_5years)) + 
+  geom_boxplot()
+g4 <- ggplot(HR, aes(x = left, y = satisfaction_level, fill=left)) + 
+  geom_boxplot()
+g5 <- ggplot(HR, aes(x = salary, y = satisfaction_level, fill=salary)) + 
+  geom_boxplot()
+
+multiplot(g2, g3, g4, g5, cols=2)
+g1
+```
+
+```{r}
+#getting 5-point summary for satisfaction level
+tapply(HR$satisfaction_level, HR$left, summary)
+```
+
+ 1. Left vs satisfaction level 
+* People leaving the company have a high variability when it comes to satisfaction levels. We can see a range of 9.11 in their satisfaction levels. 
+* 75% of people who have left the company have a satisfaction level less than 0.75, with more than 50% having a satisfaction level less than 0.5. 
+* The satisfaction level of people not leaving the company is less variable, with around 75% of them having a satisfaction level above 0.5.
+* Thus, a person leaving the company is highly likely to have a satisfaction level 0.75 or less.
+
+Other than that, rest of the relationships don't give us much information:
+
+ *  People, with or without accidents, show similar trends of satisfaction; so does the promotion vs satisfaction relationship.
+ * People with different scales of salaries show similar trends of satisfaction, only with the variability decreasing slightly with increase in payscale.
+ * People across different departments also show similar trends of satisfaction.
+```{r}
+#plotting boxplots for average_montly_hours across multiple categories in different categorical variables
+g1 <- ggplot(HR, aes(x = sales, y = average_montly_hours, fill=sales)) + 
+  geom_boxplot()
+g2 <- ggplot(HR, aes(x = Work_accident, y = average_montly_hours, fill=Work_accident)) + 
+  geom_boxplot()
+g3 <- ggplot(HR, aes(x = promotion_last_5years, y = average_montly_hours, fill=promotion_last_5years)) + 
+  geom_boxplot()
+g4 <- ggplot(HR, aes(x = left, y = average_montly_hours, fill=left)) + 
+  geom_boxplot()
+g5 <- ggplot(HR, aes(x = salary, y = average_montly_hours, fill=salary)) + 
+  geom_boxplot()
+
+multiplot(g2, g3, g4, g5, cols=2)
+g1
+```
+```{r}
+#getting 5-point summary for average_montly_hours for employees left and not left.
+tapply(HR$average_montly_hours, HR$left, summary)
+```
+Relationship of average monthly hours to other categorical variables doesn't give much information either, as the average monthly hours are mostly following similar trends across different categories, in each categorical variable respectively.
+
+One observation to be made here is that people who have left the company have a wide variability in number of hours, with a range of 184 hours. Even though this range is smaller than that of people still in the company(191), 50% of people who have left the company used to work on an average of 126 to 224 hours monthly, in comparison to 50% of people still in the company who work on an average of 96 to 198 hours monthly.
+
+Let's compare last_evaluation with the categorical variables.
+
+```{r}
+#plotting boxplots for last_evaluation across multiple categories in different categorical variables
+g1 <- ggplot(HR, aes(x = sales, y = last_evaluation, fill=sales)) + 
+  geom_boxplot()
+  #geom_point(alpha = 0.3, position = "jitter")+
+  #geom_boxplot(alpha=0, colour="black")
+g2 <- ggplot(HR, aes(x = Work_accident, y = last_evaluation, fill=Work_accident)) + 
+  geom_boxplot()
+g3 <- ggplot(HR, aes(x = promotion_last_5years, y = last_evaluation, fill=promotion_last_5years)) + 
+  geom_boxplot()
+g4 <- ggplot(HR, aes(x = left, y = last_evaluation, fill=left)) + 
+  geom_boxplot()
+g5 <- ggplot(HR, aes(x = salary, y = last_evaluation, fill=salary)) + 
+  geom_boxplot()
+
+multiplot(g2, g3, g4, g5, cols=2)
+g1
+```
+
+There is not much information to be gained here either, other than that different categories show similar trends across a quantitative variable.
+
+One thing to be observed here is that once again, people leaving the job have a high variability in their last evaluation as compared to people still in the job. Around 50% of the people who have left the job had a last evaluation from 0.8 to 1.0.
+
+```{r}
+#plotting boxplots for time_spend_company across multiple categories in different categorical variables
+g1 <- ggplot(HR, aes(x = sales, y = time_spend_company, fill=sales)) + 
+  geom_boxplot()
+g2 <- ggplot(HR, aes(x = Work_accident, y = time_spend_company, fill=Work_accident)) + 
+  geom_boxplot()
+g3 <- ggplot(HR, aes(x = promotion_last_5years, y = time_spend_company, fill=promotion_last_5years)) + 
+  geom_boxplot()
+g4 <- ggplot(HR, aes(x = left, y = time_spend_company, fill=left)) + 
+  geom_boxplot()
+g5 <- ggplot(HR, aes(x = salary, y = time_spend_company, fill=salary)) + 
+  geom_boxplot()
+
+multiplot(g2, g3, g4, g5, cols=2)
+g1
+```
+
+```{r}
+#getting 5-point summary for time_spend_company for amployees left and not left
+tapply(HR$time_spend_company, HR$left, summary)
+```
+
+Here come the outliers.
+
+50% of people spend less than 3 hours in the company, irrespective of whether they had a work accident or not.
+
+We can see that people who left the company spent around 2 to 6 hours in the company. In comparison,75% of people still in the company are spending 2 to 4 hours, with a few outliers with some spending as many as 10 hours.
+
+People who have been promoted in last 5 years spend as less as 2 hours to as many as 8 hours, with some even spending 10 hours.
+
+Salary doesn't seem to have any comparative effect on the time spent.
+
+People tend to spend mostly 2 to 5 hours, irrespective of the department. An exception is the management department where people around 25% of employees even tend to stay from 5 to 8 hours.
+
+```{r}
+#plotting boxplots for umber_project across multiple categories in different categorical variables
+g1 <- ggplot(HR, aes(x = sales, y = number_project, fill=sales)) + 
+  geom_boxplot()
+g2 <- ggplot(HR, aes(x = Work_accident, y = number_project, fill=Work_accident)) + 
+  geom_boxplot()
+g3 <- ggplot(HR, aes(x = promotion_last_5years, y = number_project, fill=promotion_last_5years)) + 
+  geom_boxplot()
+g4 <- ggplot(HR, aes(x = left, y = number_project, fill=left)) + 
+  geom_boxplot()
+g5 <- ggplot(HR, aes(x = salary, y = number_project, fill=salary)) + 
+  geom_boxplot()
+
+multiplot(g2, g3, g4, g5, cols=2)
+g1
+```
+
+People leaving the job have done from 2 to 7 projects, 50% having done 4 or more projects. In comparison, of people still at job, around 75% have done 4 or less projects. A person having done 4 or less projects is more likely to stay than leave.
+
+Around 75% of people who have been promoted in last 5 years have done 4 or less projects.
+
+## Summarized findings so far
+
+ 1. People who had a work accident were slightly more satisfied(not because of the accident, of course :p), had almost similar last evaluations, spent around same average monthly hours, worked on same number of projects, and spent slightly more variable time in the company, as compared to people still in the company.
+ 2. People who had been promoted in last 5 years were slightly more satisfied, had around similar last evaluations, spent a bit less variable but similar average monthly hours, worked on a bit less number of projects,  and spent comparatively more time in the company.
+ 3. People having high salary were slightly more satisfied, and slightly lower last evaluations. Other parameters were same across the three pay scales. 
+ 4. People in management tend to spend around twice the time in the company, in comparison with all other departments. People in HR and marketing tend to have worked on lower number of projects in comparison to all other departments. All other departments tend to share similar trends across other variables. 
+ 5. People who have left the company were less satisfied with the company, had better last evaluations, used to spend more monthly hours on an average, and usually used to spend more time in the company, in comparison to people still in the company.
+```{r}
+#getting proportions across left and sales
+t = table(HR$left,HR$sales);
+prop.table(t,2)*100
+prop.table(t,1)*100
+
+#plotting counts of employees across left and sales
+ggplotly(HR %>% 
+  count(sales, left) %>%  
+  ggplot(aes(x = sales, y = left)) +
+    geom_tile(aes(fill = n)))
+```
+
+1. HR has lost 29.09% of its employees(most by any department), followed by accounting (26.59%) and technical(25.62%).
+2. Management has been able to retain 85.56% of its employees, followed closely by R & D(84.63%), and product management(78.05%)
+3. Sales has been the biggest contributor in losing employees, with the company having lost 28.39% of the left employees from there only. 
+4. Management has contributed to losing only 2.55% employees from the company.
+
+```{r}
+#getting proportions across salary and sales
+t = table(HR$salary,HR$sales);
+prop.table(t,2)*100
+prop.table(t,1)*100
+
+##plotting counts of employees across salary and sales
+ggplotly(HR %>% 
+  count(sales, salary) %>%  
+  ggplot(aes(x = sales, y = salary)) +
+    geom_tile(aes(fill = n)))
+```
+
+1. Support provides 51.41% of its employees with a low salary, followed by technical(50.44%) and product management(50%).
+2. Mangement provides 35.71% of its employees with a high salary, followed by a big margin by accounting(9.64%).
+3. 21.74% of the company employees getting a high salary are from the Sales department, followed by management(18.19%).
+4. Strangely, 28.69% of the company employees getting a low salary are also coming from the Sales department, followed by technical(18.75%)
+
+```{r}
+#getting proportions across promotion_last_5years and sales
+t = table(HR$promotion_last_5years,HR$sales);
+prop.table(t,2)*100
+prop.table(t,1)*100
+
+#plotting counts of employees across promotion_last_5years and sales
+ggplotly(HR %>% 
+  count(sales, promotion_last_5years) %>%  
+  ggplot(aes(x = sales, y = promotion_last_5years)) +
+    geom_tile(aes(fill = n)))
+```
+
+1. 10.95% employees from the management have been promoted in the last 5 years, followed by marketing(5.01%).
+2. The award for promoting no one in last 5 years goes to Product management. IT department follows with promotion of only 0.24% of its employees.
+3. 31.34% of the employees promoted in the last year are from Sales department, followed by management(21.63%).
+4. As an obvious fact, product management has not contributed to any promotion in the company in last 5 years. Only 0.94% of the promoted employees come from IT.
+
+```{r}
+#getting proportions across Work_accident and sales
+t = table(HR$Work_accident,HR$sales);
+prop.table(t,2)*100
+prop.table(t,1)*100
+
+#plotting counts of employees across Work_accident and sales
+ggplotly(HR %>% 
+  count(sales, Work_accident) %>%  
+  ggplot(aes(x = sales, y = Work_accident)) +
+    geom_tile(aes(fill = n)))
+```
+
+1. Similar percentage of people in each department had work accidents.
+2. Sales department has the most work accidents in the company(27.06%), with HR department having the least(4.10%).
+
+```{r}
+#getting proportions across salary and left
+t = table(HR$left,HR$salary);
+prop.table(t,2)*100
+prop.table(t,1)*100
+
+#plotting counts of employees across salary and left
+ggplotly(HR %>% 
+  count(salary, left) %>%  
+  ggplot(aes(x = salary, y = left)) +
+    geom_tile(aes(fill = n)))
+```
+
+ 1. 29% of people with low salary have left, followed by people with medium salary(20.43%).
+ 2. 60.82% of people who have left had a low salary, along with 36.88% having a medium salary.
+ 
+```{r}
+#getting proportions across promotion_last_5years and salary
+t = table(HR$promotion_last_5years,HR$salary);
+prop.table(t,2)*100
+prop.table(t,1)*100
+
+#plotting counts of employees across promotion_last_5years and salary
+ggplotly(HR %>% 
+  count(salary, promotion_last_5years) %>%  
+  ggplot(aes(x = salary, y = promotion_last_5years), colour = "grey50") +
+    geom_tile(aes(fill = n) ))
+```
+
+ 1.82% of people with high salary were promoted in last 5 years, while only 2.8% of medium and 0.9% of low salaried people were.
+ 2. Out of all the people who were promoted, 56.74% had a medium salary and 49.39% of people who were not promoted, had low salary.
+ 
+```{r}
+#getting proportions across Work_accident and salary
+t = table(HR$Work_accident,HR$salary);
+prop.table(t,2)*100
+prop.table(t,1)*100
+
+#plotting counts of employees across salary and Work_accident
+ggplotly(HR %>% 
+  count(salary, Work_accident) %>%  
+  ggplot(aes(x = salary, y = Work_accident), colour = "grey50") +
+    geom_tile(aes(fill = n) ))
+```
+ 1. Almost same percentage of people from each payscale had a work accident.
+ 2. 47.95% of people who had an accident had a low salary.
+ 
+```{r}
+#getting proportions across promotion_last_5years and left
+t = table(HR$left,HR$promotion_last_5years);
+prop.table(t,2)*100
+prop.table(t,1)*100
+
+#plotting counts of employees across promotion_last_5years and left
+ggplotly(HR %>% 
+  count(promotion_last_5years, left) %>%  
+  ggplot(aes(x = promotion_last_5years, y = left), colour = "grey50") +
+    geom_tile(aes(fill = n) ))
+```
+
+ 1. 94.04% of people who had been promoted are still in the company.
+ 2. 24.20% of people who hadn't been promoted have left the company.
+ 3. 99.47% of the people who have left hadn't been promoted in last 5 years.
+ 4. 97.37% of the people who are still in the company were not promoted in the last 5 years.
+```{r}
+#getting proportions across promotion_last_5years and Work_accident
+t = table(HR$Work_accident,HR$promotion_last_5years);
+prop.table(t,2)*100
+prop.table(t,1)*100
+
+#plotting counts of employees across promotion_last_5years and Work_accident
+ggplotly(HR %>% 
+  count(promotion_last_5years, Work_accident) %>%  
+  ggplot(aes(x = promotion_last_5years, y = Work_accident), colour = "grey50") +
+    geom_tile(aes(fill = n) ))
+```
+ 1. 85.74% of people who hadn't been promoted in the last 5 years had a work accident.
+ 2. 85.74% of people who had been promoted in the last 5 years had a work accident.
+ 3. 96.5% of the people who had a work accident had been promoted in last 5 years.
+ 4. 98.11% of people who had not been promoted in last 5 years had a work accident.
+ 
+```{r}
+#pairwise comparison of quantitative variables
+ggpairs(HR[, c("satisfaction_level", "last_evaluation", "number_project", "average_montly_hours", "time_spend_company")], 
+        aes(color='red'))
+```
+
+ 1. There are no linear relations between the quantitative variables.
+ 2. The strongest correlation is between average monthly hours and number of projects which is just 0.417. Still, this correlation value is of no use as there is no linear relationship.
+ 
+ Let's try to see if we can find any clusters with respect to people leaving the job.
+```{r}
+#pairwise comparison of quantitative variables labelled by left or not left
+ggpairs(HR[, c("satisfaction_level", "last_evaluation", "number_project", "average_montly_hours", "time_spend_company", "left")], 
+        aes(color=left))
+```
+
+ 1. There are no linear relationships/clusters between the variables even when looked upon on the basis of left.
+ 2. As expected above, good evaluation doesn't necessarily relate to high satisfaction.
+ 
+# Summarized findings
+ 1. Sales department is more likely to lose employees than any other department, while a person from Management is most likely to stay in the job.
+ 2. A person with high salary is most likely from sales department. A person with low salary is also most likely from the sales department. Within the sales department, it is highly likely to find a low salaried employee than a high salaried employee(odds being 0.128 to 1).
+ 3. Management promotes highest proportion of its employees. Product management hasn't promoted anyone in 5 years, and equally unlikely is IT to promote its employees.
+ 4. A person promoted in last 5 years is highly likely to be from the Sales department.
+ 5. Most of the people who have left had a low salary. A person with high salary is highly unlikely to leave.
+ 6. If a person has a high salary, he/she is highly likely to have been promoted in the last 5 years.
+ 7. A person caught in a work accident is highly likely to have a low salary.
+ 8. If a person has been promoted in last 5 years, he/she is highly likely to stay(94% chance).
+ 9. If a person has left the company, it is highly likely that he/she hadn't been promoted in last 5 years(99% chance).
+ 10. A person who has left the company is likely to have been less satisfied with the company.
+ 
+ 
+To be continued with more findings and inferences.
+```{r}
+
+# Scatter plot of x and y variables and color by groups
+scatterPlot <- ggplot(HR,aes(satisfaction_level, last_evaluation, color=left)) + 
+  geom_point() + 
+  scale_color_manual(values = c('#999999','#E69F00'))# + 
+  #theme(legend.position=c(0,1), legend.justification=c(0,1))
+# Marginal density plot of x (top panel)
+xdensity <- ggplot(HR, aes(satisfaction_level, fill=left)) + 
+  geom_density(alpha=.5) + 
+  scale_fill_manual(values = c('#999999','#E69F00')) + 
+  theme(legend.position = "none")
+# Marginal density plot of y (right panel)
+ydensity <- ggplot(HR, aes(last_evaluation, fill=left)) + 
+  geom_density(alpha=.5) + 
+  scale_fill_manual(values = c('#999999','#E69F00')) + 
+  theme(legend.position = "none")
+
+blankPlot <- ggplot()+geom_blank(aes(1,1))+
+  theme(
+    plot.background = element_blank(), 
+   panel.grid.major = element_blank(),
+   panel.grid.minor = element_blank(), 
+   panel.border = element_blank(),
+   panel.background = element_blank(),
+   axis.title.x = element_blank(),
+   axis.title.y = element_blank(),
+   axis.text.x = element_blank(), 
+   axis.text.y = element_blank(),
+   axis.ticks = element_blank(),
+   axis.line = element_blank()
+     )
+
+library("gridExtra")
+grid.arrange(xdensity, blankPlot, scatterPlot, ydensity, 
+        ncol=2, nrow=2, widths=c(4, 1.4), heights=c(1.4, 4))
+```
+```{r}
+d1 <- ggplot(HR, aes(satisfaction_level, fill=left, colour = left)) +
+  geom_density(alpha=0.1)
+d2 <- ggplot(HR, aes(last_evaluation, colour = left)) +
+  geom_density()
+d3 <- ggplot(HR, aes(time_spend_company, colour = left)) +
+  geom_density()
+d4 <- ggplot(HR, aes(average_montly_hours, colour = left)) +
+  geom_density()
+d5 <- ggplot(HR, aes(number_project, colour = left)) +
+  geom_density()
+d6 <- ggplot(HR, aes(satisfaction_level, colour = sales)) +
+  geom_density()
+
+multiplot(d1,d2,d3,d4,d5,d6, cols=2)
+```
+
+
+
+
+
